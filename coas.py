@@ -20,6 +20,9 @@ class ExpressionToken:
 
 class AssemblerMacro:
     def __init__(self, args, terms):
+        for a in args:
+            if isinstance(a, AssemblerRegister):
+                raise AssemblerException(a.pos, "Cannot use register name as argument")
         self.args = args
         self.terms = terms
 
