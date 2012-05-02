@@ -71,6 +71,10 @@ class AssemblerMeta:
         m.parameters = [s.clone(**kwargs) for s in self.parameters]
         return m
 
+    def setGroup(self, group):
+        for p in self.parameters:
+            p.setGroup(group)
+
     def __str__(self):
         return "pseudo-operator '%s' %s" % (self.name, ' '.join([str(s) for s in self.parameters]))
 
@@ -86,7 +90,10 @@ class AssemblerLabel:
     def __init__(self, pos, name):
         self.pos = pos
         self.name = name
-        self.group = -1
+
+    def setGroup(self, group):
+        if self.name[0] == '_':
+            self.name += ":%i" % group
 
     def clone(self, **kwargs):
         if self.name[0] == '_' and 'remap' in kwargs:
@@ -121,6 +128,8 @@ class AssemblerEOF:
 class AssemblerExpression:
     def fold(self, **kwargs):
         return self
+    def setGroup(self, group):
+        pass
     def clone(self, **kwargs):
         return self
 
@@ -132,6 +141,9 @@ class AssemblerUnary(AssemblerExpression):
 
         if isinstance(term, AssemblerString) or isinstance(self.term, AssemblerRegister):
             raise AssemblerException(term.pos, "Cannot operate on %s" % term)
+
+    def setGroup(self, group):
+        self.term.setGroup(group)
 
     def clone(self, **kwargs):
         return AssemblerUnary(self.pos, self.operation, self.term.clone(**kwargs))
@@ -184,6 +196,10 @@ class AssemblerBinary(AssemblerExpression):
 
         self.term_a = term_a
         self.term_b = term_b
+
+    def setGroup(self, group):
+        self.term_a.setGroup(group)
+        self.term_b.setGroup(group)
 
     def clone(self, **kwargs):
         return AssemblerBinary(self.pos, self.operation, self.term_a.clone(**kwargs), self.term_b.clone(**kwargs))
@@ -252,7 +268,12 @@ class AssemblerWord(AssemblerExpression):
         self.pos = pos
         self.word = word.lower()
         self.parameters = []
-        self.group = -1
+
+    def setGroup(self, group):
+        for p in self.parameters:
+            p.setGroup(group)
+        if self.word[0] == '_':
+            self.word += ":%i" % (group)
 
     def clone(self, **kwargs):
         if self.word[0] == '_' and 'remap' in kwargs:
@@ -265,10 +286,7 @@ class AssemblerWord(AssemblerExpression):
         return w
 
     def fold(self, **kwargs):
-        if 'group' in kwargs and self.word[0] == '_':
-            word = (kwargs['group'], self.word)
-        else:
-            word = self.word
+        word = self.word
 
         if 'validate' in kwargs:
             kwargs['validate'](word)
@@ -302,6 +320,9 @@ class AssemblerIndirect(AssemblerExpression):
 class AssemblerParameterList:
     def __init__(self, *kargs):
         self.list = list(kargs)
+    def setGroup(self, group):
+        for p in self.list:
+            p.setGroup(group)
     def clone(self, **kwargs):
         return AssemblerParameterList(*[s.clone(**kwargs) for s in self.list])
     def add(self, e):
@@ -529,9 +550,9 @@ class Assembler:
                 yield d
 
     """ Search and replace words """
-    def equate(self, token, words, group=0):
+    def equate(self, token, words):
         if isinstance(token, AssemblerMeta) or isinstance(token, AssemblerWord):
-            token.parameters = [s.fold(words=words, group=group) for s in token.parameters]
+            token.parameters = [s.fold(words=words) for s in token.parameters]
             return token
         else:
             return token
@@ -625,7 +646,8 @@ class Assembler:
         group, next = 0, 1
         
         for t in tokens:
-            t.group = group
+            t.setGroup(group)
+
             if isinstance(t, AssemblerMeta):
                 if t.name in ['.big', '.little', '.data']:
                     if len(t.parameters) != 1:
@@ -658,7 +680,6 @@ class Assembler:
                     continue
 
                 binary = self.binary(t.pos, t.name, [d.number for d in data])
-                binary.group = t.group
                 yield binary
             else:
                 yield t
@@ -704,10 +725,7 @@ class Assembler:
                     position += len(t.data)
                 yield t
             elif isinstance(t, AssemblerLabel):
-                if t.name[0] == '_':
-                    word = (t.group, t.name)
-                else:
-                    word = t.name
+                word = t.name
                 
                 discovered[:] += [word]
 
@@ -836,7 +854,6 @@ class Assembler:
                     data += [data_b]
 
                 block = AssemblerDataBlock(t.pos, data)
-                block.group = t.group
                 yield block
             else:
                 yield t
@@ -850,7 +867,7 @@ class Assembler:
             if isinstance(t, AssemblerWord):
                 for p in t.parameters:
                     for l in p.list:
-                        l.fold(group=t.group,validate=validate)
+                        l.fold(validate=validate)
             yield t
 
     def finished(self, set):
@@ -867,7 +884,7 @@ class Assembler:
                 continue
             for b in t.data:
                 if isinstance(b, AssemblerExpression):
-                    o = b.fold(words=words, group=t.group)
+                    o = b.fold(words=words)
                     
                     if isinstance(o, AssemblerNumber):
                         yield o.number & 0xFFFF
@@ -882,9 +899,14 @@ class Assembler:
         tokens = self.definitions(self.flatten(filename))
         tokens = self.pack(self.process(tokens))
         tokens = self.undefined(self.label([t for t in tokens], labels, discovered), discovered)
+
+        # Flatten tokens, flag parameters as relocating here
+        tokens = [t for t in tokens]
+
         tokens = self.instruct(self.refold(self.pack(self.label([t for t in tokens], labels)), labels))
 
         tokens = [t for t in tokens]
+
         while not self.finished(tokens):
             tokens = self.instruct(self.refold(self.pack(self.label([t for t in tokens], labels)), labels), flatten=True)
             tokens = [t for t in tokens]
