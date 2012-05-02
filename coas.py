@@ -26,10 +26,11 @@ class ExpressionToken:
         return "%s token '%s'" % (self.category, self.token)
 
 class AssemblerMacro:
-    def __init__(self, args, terms):
+    def __init__(self, name, args, terms):
         for a in args:
             if isinstance(a, AssemblerRegister):
                 raise AssemblerException(a.pos, "Cannot use register name as argument")
+        self.name = name
         self.args = args
         self.terms = terms
 
@@ -48,7 +49,7 @@ class AssemblerMacro:
             raise AssemblerException(t.pos, "Macro argument count mismatch")
 
         for t in self.terms:
-            e = t.clone(remap=id(self))
+            e = t.clone(remap=self.name)
             if isinstance(e, AssemblerMeta) or isinstance(e, AssemblerWord):
                 e.parameters = [i.fold(words=words) for i in e.parameters]
             yield e
@@ -83,7 +84,7 @@ class AssemblerLabel:
 
     def clone(self, **kwargs):
         if self.name[0] == '_' and 'remap' in kwargs:
-            return AssemblerLabel(self.pos, "%s:%i" % (self.name, kwargs['remap']))
+            return AssemblerLabel(self.pos, "%s:%s" % (self.name, kwargs['remap']))
 
         return self
 
@@ -249,7 +250,7 @@ class AssemblerWord(AssemblerExpression):
 
     def clone(self, **kwargs):
         if self.word[0] == '_' and 'remap' in kwargs:
-            word = "%s:%i" % (self.word, kwargs['remap'])
+            word = "%s:%s" % (self.word, kwargs['remap'])
         else:
             word = self.word
 
@@ -596,7 +597,7 @@ class Assembler:
                     except StopIteration:
                         raise AssemblerException(t.pos, "Unexpected End of File")
 
-                    macros[name.word] = AssemblerMacro(args, contents)
+                    macros[name.word] = AssemblerMacro(name.word, args, contents)
                 else:
                     for k in self.macro(t, macros, equs):
                         yield k
@@ -859,10 +860,6 @@ class Assembler:
 
         tokens = self.flatten(filename)
         tokens = self.definitions(tokens)
-        tokens = [t for t in tokens]
-        for t in tokens:
-            print t
-
         tokens = self.pack(self.process(tokens))
         tokens = self.undefined(self.label([t for t in tokens], labels, discovered), discovered)
         tokens = self.instruct(self.refold(self.pack(self.label([t for t in tokens], labels)), labels))
