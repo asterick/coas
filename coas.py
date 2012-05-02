@@ -865,11 +865,6 @@ class Assembler:
         labels, discovered = {}, []
 
         tokens = self.definitions(self.flatten(filename))
-
-        tokens = [t for t in tokens]
-        for t in tokens:
-            print t
-
         tokens = self.pack(self.process(tokens))
         tokens = self.undefined(self.label([t for t in tokens], labels, discovered), discovered)
         tokens = self.instruct(self.refold(self.pack(self.label([t for t in tokens], labels)), labels))
