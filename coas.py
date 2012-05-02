@@ -666,7 +666,22 @@ class Assembler:
     def label(self, tokens, words, discovered = []):
         position = 0
         for t in tokens:
-            if isinstance(t, AssemblerMeta) and t.name in ['.org', '.bss']:
+            if isinstance(t, AssemblerMeta) and t.name in ['.align']:
+                if len(t.parameters) != 1 or len(t.parameters[0].list) != 1:
+                    raise AssemblerException("Malformed expression %s" % t)
+
+                num = t.parameters[0].list[0].fold(words=words)
+                t.parameters[0].list = [num]
+
+                if position != None and isinstance(num, AssemblerNumber):
+                    offset = position % num.number
+                    if offset:
+                        yield AssemblerDataBlock(t.pos, [0]*(num.number-offset))
+                else:
+                    position = None
+                    yield t
+                    continue
+            elif isinstance(t, AssemblerMeta) and t.name in ['.org', '.bss']:
                 if len(t.parameters) != 1 or len(t.parameters[0].list) != 1:
                     raise AssemblerException("Malformed expression %s" % t)
 
@@ -899,7 +914,7 @@ def datBlocks(data):
             yield c[i:i+chunkSize]
 
     for addr, block in enumerate(chunk(data)):
-        yield "dat %s ; %4x" % (', '.join(["%4s" % hex(o) for o in block]), addr*chunkSize)
+        yield "dat %s ; %x" % (', '.join(["%6s" % hex(o) for o in block]), addr*chunkSize)
 
 def mapping(words):
     for k, v in words.items():

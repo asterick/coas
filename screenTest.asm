@@ -2,8 +2,8 @@
 
 .org 0x000
 
-.macro  crash
-_targ:  ADD PC, _targ - _ref
+.macro  jmp address
+        SUB PC, _ref - address
 _ref:
 .endmacro
 
@@ -18,9 +18,10 @@ _loop:  SET [B+screen], A
         AND C, 0x80
         ADD A, C
         IFN B, 0x180
-            SET PC, _loop
-        crash
+            JMP _loop
 .endproc
+
+crash:  jmp crash
 
 .proc
 setup_screen:
@@ -28,14 +29,13 @@ setup_screen:
 _loop:  SUB I, 1
         IFU I, 0
             SET PC, POP
-
         HWQ I
 
         ; Locate a LEM-1802
         IFN A, $f615
         IFN B, $7349
         IFN C, $1802
-            SET PC, _loop
+            JMP _loop
         
         ; Set screen mapping
         SET A, 0
@@ -50,7 +50,7 @@ _loop:  SUB I, 1
         SET B, char
         HWI I
         
-        SET PC, _loop
+        JMP _loop
 .endproc
 
 screen: .bss 0x180
