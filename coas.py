@@ -33,6 +33,11 @@ class AssemblerMacro:
         self.name = name
         self.args = args
         self.terms = terms
+        self.instance = 0
+
+    def id(self):
+        self.instance += 1
+        return "%s%i" % (self.name, self.instance)
 
     def process(self, t):
         params = t.parameters
@@ -48,8 +53,9 @@ class AssemblerMacro:
         if param_count != len(self.args):
             raise AssemblerException(t.pos, "Macro argument count mismatch")
 
+        uuid = self.id()
         for t in self.terms:
-            e = t.clone(remap=self.name)
+            e = t.clone(remap=uuid)
             if isinstance(e, AssemblerMeta) or isinstance(e, AssemblerWord):
                 e.parameters = [i.fold(words=words) for i in e.parameters]
             yield e
@@ -858,8 +864,12 @@ class Assembler:
     def assemble(self, filename):
         labels, discovered = {}, []
 
-        tokens = self.flatten(filename)
-        tokens = self.definitions(tokens)
+        tokens = self.definitions(self.flatten(filename))
+
+        tokens = [t for t in tokens]
+        for t in tokens:
+            print t
+
         tokens = self.pack(self.process(tokens))
         tokens = self.undefined(self.label([t for t in tokens], labels, discovered), discovered)
         tokens = self.instruct(self.refold(self.pack(self.label([t for t in tokens], labels)), labels))
@@ -894,7 +904,7 @@ def datBlocks(data):
             yield c[i:i+chunkSize]
 
     for addr, block in enumerate(chunk(data)):
-        yield "dat %s ; %4x" % (', '.join([hex(o) for o in block]), addr*chunkSize)
+        yield "dat %s ; %4x" % (', '.join(["%4s" % hex(o) for o in block]), addr*chunkSize)
 
 def mapping(words):
     for k, v in words.items():

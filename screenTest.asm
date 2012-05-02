@@ -10,10 +10,13 @@ _ref:
 .proc
 reset:  JSR setup_screen
         SET B, 0
-        SET A, 0xC000
+        SET A, 0xC900
 _loop:  SET [B+screen], A
         ADD B, 1
         ADD A, 1
+        SET C, A
+        AND C, 0x80
+        ADD A, C
         IFN B, 0x180
             SET PC, _loop
         crash
