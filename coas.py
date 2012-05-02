@@ -685,7 +685,7 @@ class Assembler:
                 yield t
 
     def label(self, tokens, words, discovered = []):
-        position = 0
+        position, tokens = 0, list(tokens)
         for t in tokens:
             if isinstance(t, AssemblerMeta) and t.name in ['.align']:
                 if len(t.parameters) != 1 or len(t.parameters[0].list) != 1:
@@ -894,23 +894,24 @@ class Assembler:
                     yield b
 
     def assemble(self, filename):
-        labels, discovered = {}, []
+        labels, discovered, flatten = {}, [], False
 
         tokens = self.definitions(self.flatten(filename))
         tokens = self.pack(self.process(tokens))
-        tokens = [t for t in tokens]
-        tokens = self.undefined(self.label(tokens, labels, discovered), discovered)
+        tokens = self.label(tokens, labels, discovered)
+        tokens = self.undefined(tokens, discovered)
 
         # Flatten tokens, flag parameters as relocating here
-        tokens = [t for t in tokens]
 
-        tokens = self.instruct(self.refold(self.pack(self.label(tokens, labels)), labels))
-
-        tokens = [t for t in tokens]
-
-        while not self.finished(tokens):
-            tokens = self.instruct(self.refold(self.pack(self.label(tokens, labels)), labels), flatten=True)
-            tokens = [t for t in tokens]
+        while True:
+            tokens = list(tokens)
+            if self.finished(tokens): 
+                break
+            tokens = self.label(tokens, labels)
+            tokens = self.pack(tokens)
+            tokens = self.refold(tokens, labels)
+            tokens = self.instruct(tokens, flatten=flatten)
+            flatten = True
 
         return [b for b in self.data(tokens, words=labels)], labels
         
