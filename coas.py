@@ -898,17 +898,18 @@ class Assembler:
 
         tokens = self.definitions(self.flatten(filename))
         tokens = self.pack(self.process(tokens))
-        tokens = self.undefined(self.label([t for t in tokens], labels, discovered), discovered)
+        tokens = [t for t in tokens]
+        tokens = self.undefined(self.label(tokens, labels, discovered), discovered)
 
         # Flatten tokens, flag parameters as relocating here
         tokens = [t for t in tokens]
 
-        tokens = self.instruct(self.refold(self.pack(self.label([t for t in tokens], labels)), labels))
+        tokens = self.instruct(self.refold(self.pack(self.label(tokens, labels)), labels))
 
         tokens = [t for t in tokens]
 
         while not self.finished(tokens):
-            tokens = self.instruct(self.refold(self.pack(self.label([t for t in tokens], labels)), labels), flatten=True)
+            tokens = self.instruct(self.refold(self.pack(self.label(tokens, labels)), labels), flatten=True)
             tokens = [t for t in tokens]
 
         return [b for b in self.data(tokens, words=labels)], labels
