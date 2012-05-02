@@ -11,6 +11,7 @@ _ref:
 reset:  JSR setup_screen
         SET B, 0
         SET A, 0xC900
+        SET A, [A]
 _loop:  SET [B+screen], A
         ADD B, 1
         ADD A, 1

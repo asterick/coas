@@ -133,116 +133,21 @@ class AssemblerExpression:
     def clone(self, **kwargs):
         return self
 
-class AssemblerUnary(AssemblerExpression):
-    def __init__(self, pos, op, term):
+class AssemblerString(AssemblerExpression):
+    def __init__(self, pos, string):
         self.pos = pos
-        self.operation = op
-        self.term = term
-
-        if isinstance(term, AssemblerString) or isinstance(self.term, AssemblerRegister):
-            raise AssemblerException(term.pos, "Cannot operate on %s" % term)
-
-    def setGroup(self, group):
-        self.term.setGroup(group)
-
-    def clone(self, **kwargs):
-        return AssemblerUnary(self.pos, self.operation, self.term.clone(**kwargs))
-
-    def fold(self, **kwargs):
-        self.term = self.term.fold(**kwargs)
-
-        if not isinstance(self.term, AssemblerNumber):
-            return self
-
-        if self.operation == '+':
-            return self.term
-        if self.operation == '-':
-            return AssemblerNumber(self.pos, -self.term.number)
-        if self.operation == '~':
-            return AssemblerNumber(self.pos, ~self.term.number)
+        self.string = string
 
     def __str__(self):
-        return "%s%s" % (self.operation, self.term)
-
-class AssemblerBinary(AssemblerExpression):
-    OPERATION = {
-    '+': lambda a, b: a + b,
-    '*': lambda a, b: a * b,
-    '/': lambda a, b: a / b,
-    '%': lambda a, b: a % b,
-    '^': lambda a, b: a ^ b,
-    '|': lambda a, b: a | b,
-    '&': lambda a, b: a & b,
-    '<<': lambda a, b: a << b,
-    '>>': lambda a, b: a >> b,
-    '&&': lambda a, b: a and b,
-    '||': lambda a, b: a or b,
-    '!=': lambda a, b: (a != b) and 1 or 0,
-    '==': lambda a, b: (a == b) and 1 or 0,
-    '>=': lambda a, b: (a >= b) and 1 or 0,
-    '<=': lambda a, b: (a <= b) and 1 or 0,
-    '>': lambda a, b: (a > b) and 1 or 0,
-    '<': lambda a, b: (a < b) and 1 or 0,
-    }
-
-    def __init__(self, pos, op, term_a, term_b):
-        self.pos = pos
-        self.operation = op
-
-        if isinstance(term_a, AssemblerString):
-            raise AssemblerException(term_a.pos, "Cannot operate on %s" % term_a)
-        if isinstance(term_b, AssemblerString):
-            raise AssemblerException(term_b.pos, "Cannot operate on %s" % term_b)
-
-        self.term_a = term_a
-        self.term_b = term_b
-
-    def setGroup(self, group):
-        self.term_a.setGroup(group)
-        self.term_b.setGroup(group)
-
-    def clone(self, **kwargs):
-        return AssemblerBinary(self.pos, self.operation, self.term_a.clone(**kwargs), self.term_b.clone(**kwargs))
-
-    def fold(self, **kwargs):
-        # Convert subtraction into addition
-        if self.operation == '-':
-            self.operation = '+'
-            self.term_b = AssemblerUnary(self.pos, '-', self.term_b)
-
-        self.term_a = self.term_a.fold(**kwargs)
-        self.term_b = self.term_b.fold(**kwargs)
-
-        if not isinstance(self.term_a, AssemblerNumber) or not isinstance(self.term_b, AssemblerNumber):
-            # Do some stuff with identifies
-            if self.operation in ["*", "+"]:
-                if isinstance(self.term_a, AssemblerNumber):
-                    self.term_a, self.term_b = self.term_b, self.term_a
-
-                if isinstance(self.term_b, AssemblerNumber):
-                    if self.operation == '*':
-                        if self.term_b.number == 0:
-                            return AssemblerNumber(self.pos, 0)
-                        if self.term_b.number == 1:
-                            return self.term_a
-                    elif self.operation == '+':
-                        if self.term_b.number == 0:
-                            return self.term_a
-
-            return self
-
-        a, b = self.term_a.number, self.term_b.number
-        pos = self.term_a.pos
-
-        return AssemblerNumber(pos, self.OPERATION[self.operation](a, b))
-
-    def __str__(self):
-        return "(%s %s %s)" % (self.term_a, self.operation, self.term_b)
+        return '"%s"' % self.string.encode("unicode_escape")
 
 class AssemblerNumber(AssemblerExpression):
     def __init__(self, pos, number):
         self.pos = pos
         self.number = number
+
+    def containsWords(self):
+        return False
 
     def __str__(self):
         return "%s" % self.number
@@ -252,16 +157,11 @@ class AssemblerRegister(AssemblerExpression):
         self.pos = pos
         self.register = reg.lower()
 
+    def containsWords(self):
+        return True
+
     def __str__(self):
         return 'reg %s' % self.register
-
-class AssemblerString(AssemblerExpression):
-    def __init__(self, pos, string):
-        self.pos = pos
-        self.string = string
-
-    def __str__(self):
-        return '"%s"' % self.string.encode("unicode_escape")
 
 class AssemblerWord(AssemblerExpression):
     def __init__(self, pos, word):
@@ -302,6 +202,115 @@ class AssemblerWord(AssemblerExpression):
         else:
             return "term '%s'" % (self.word)
 
+class AssemblerUnary(AssemblerExpression):
+    def __init__(self, pos, op, term):
+        self.pos = pos
+        self.operation = op
+        self.term = term
+
+        if isinstance(term, AssemblerString) or isinstance(self.term, AssemblerRegister):
+            raise AssemblerException(term.pos, "Cannot operate on %s" % term)
+
+    def setGroup(self, group):
+        self.term.setGroup(group)
+
+    def clone(self, **kwargs):
+        return AssemblerUnary(self.pos, self.operation, self.term.clone(**kwargs))
+
+    def fold(self, **kwargs):
+        self.term = self.term.fold(**kwargs)
+
+        if not isinstance(self.term, AssemblerNumber):
+            return self
+
+        if self.operation == '-':
+            return AssemblerNumber(self.pos, -self.term.number)
+        elif self.operation == '~':
+            return AssemblerNumber(self.pos, ~self.term.number)
+
+    def __str__(self):
+        return "%s%s" % (self.operation, self.term)
+
+class AssemblerBinary(AssemblerExpression):
+    OPERATION = {
+    '+': lambda a, b: a + b,
+    '*': lambda a, b: a * b,
+    '/': lambda a, b: a / b,
+    '%': lambda a, b: a % b,
+    '^': lambda a, b: a ^ b,
+    '|': lambda a, b: a | b,
+    '&': lambda a, b: a & b,
+    '<<': lambda a, b: a << b,
+    '>>': lambda a, b: a >> b,
+    '&&': lambda a, b: a and b,
+    '||': lambda a, b: a or b,
+    '!=': lambda a, b: (a != b) and 1 or 0,
+    '==': lambda a, b: (a == b) and 1 or 0,
+    '>=': lambda a, b: (a >= b) and 1 or 0,
+    '<=': lambda a, b: (a <= b) and 1 or 0,
+    '>': lambda a, b: (a > b) and 1 or 0,
+    '<': lambda a, b: (a < b) and 1 or 0,
+    }
+
+    def __init__(self, pos, op, term_a, term_b):
+        self.pos = pos
+        self.operation = op
+
+        if isinstance(term_b, AssemblerRegister) or isinstance(term_a, AssemblerRegister):
+            if self.operation != '+':
+                raise AssemblerException(self.pos, "Cannot perform operation %s on a register" % op)
+                
+            if isinstance(term_b, AssemblerRegister):
+                if isinstance(term_a, AssemblerRegister):
+                    raise AssemblerException(self.pos, "Cannot perform an operation against two registers")
+                
+                term_b, term_a = term_a, term_b
+
+        if isinstance(term_a, AssemblerString):
+            raise AssemblerException(term_a.pos, "Cannot operate on %s" % term_a)
+        if isinstance(term_b, AssemblerString):
+            raise AssemblerException(term_b.pos, "Cannot operate on %s" % term_b)
+
+        self.term_a = term_a
+        self.term_b = term_b
+
+    def setGroup(self, group):
+        self.term_a.setGroup(group)
+        self.term_b.setGroup(group)
+
+    def clone(self, **kwargs):
+        return AssemblerBinary(self.pos, self.operation, self.term_a.clone(**kwargs), self.term_b.clone(**kwargs))
+
+    def fold(self, **kwargs):
+        self.term_a = self.term_a.fold(**kwargs)
+        self.term_b = self.term_b.fold(**kwargs)
+
+        if not isinstance(self.term_a, AssemblerNumber) or not isinstance(self.term_b, AssemblerNumber):
+            # Do some stuff with identifies
+            if self.operation in ["*", "+"]:
+                if isinstance(self.term_a, AssemblerNumber):
+                    self.term_a, self.term_b = self.term_b, self.term_a
+
+                if isinstance(self.term_b, AssemblerNumber):
+                    if self.operation == '*':
+                        if self.term_b.number == 0:
+                            return AssemblerNumber(self.pos, 0)
+                        if self.term_b.number == 1:
+                            return self.term_a
+                    elif self.operation == '+':
+                        if self.term_b.number == 0:
+                            return self.term_a
+
+            return self
+
+        a, b = self.term_a.number, self.term_b.number
+        pos = self.term_a.pos
+
+        return AssemblerNumber(pos, self.OPERATION[self.operation](a, b))
+
+    def __str__(self):
+        return "(%s %s %s)" % (self.term_a, self.operation, self.term_b)
+
 class AssemblerIndirect(AssemblerExpression):
     def __init__(self, pos, term):
         self.pos = pos
@@ -340,17 +349,19 @@ def chunks(l, n):
 class Assembler:
     FLAGS = re.X|re.U|re.I
     RADIX = {'hex_a': 16, 'oct': 8, 'dec': 10, 'bin_a': 2, 'bin_b': 2}
-    UNARY = ["-","~","+"]
+    UNARY = ["-","~"]
     OPEN_CLOSE = { '(': ')', '[': ']' }
     INDIRECT = '['
     ORDER_OF_OPERATIONS = [
-        ["%","/","*"],
+        ["%"],
+        ["/","*"],
         ["&","|","^"],
         ["<<",">>"],
         [">=","<=",">","<","==","!="],
         ["||"],
         ["&&"],
-        ["+","-"]
+        ["-"],
+        ["+"]
     ]
     REGISTER = re.compile(r"^(push|pop|pc|sp|ex|a|b|c|x|y|z|i|j)$",FLAGS)
     TOKENS = re.compile(r"""
@@ -455,16 +466,31 @@ class Assembler:
             flattened += [op, term]
 
         for group in self.ORDER_OF_OPERATIONS:
+            if group == ['+']:
+                for x in range(0, len(flattened)-2, 2):
+                    for y in range(x+2, len(flattened), 2):
+                        a, b = flattened[x], flattened[y]
+
+                        if isinstance(a, AssemblerRegister):
+                            a, b = b, a
+
+                        flattened[x], flattened[y] = a, b
+
             idx = 1
             while idx < len(flattened):
-                if flattened[idx].operation in group:
+                if group == ['-']:
+                    # Convert subtraction to addition
+                    if flattened[idx].operation == '-':
+                        term = flattened[idx+1]
+                        flattened[idx].operation = '+'
+                        flattened[idx+1:idx+2] = [AssemblerUnary(term.pos, '-', term)]
+
+                    idx += 2
+                elif flattened[idx].operation in group:
                     term_a, op, term_b = flattened[idx-1:idx+2]
                     flattened[idx-1:idx+2] = [AssemblerBinary(term_a.pos, op.operation, term_a, term_b)]
                 else:
                     idx += 2
-
-        if len(flattened) != 1:
-            raise AssemblerException(flattened[1].pos, "Invalid use of %s" % flattened[1])
 
         return flattened[0], tokens
 
@@ -479,7 +505,6 @@ class Assembler:
         arguments = []
         while len(tokens) > 1:
             exp, tokens = self.expression(tokens)
-
             params = [exp]
 
             while isinstance(tokens[0], ExpressionToken) and tokens[0].category == 'comma':
@@ -893,27 +918,44 @@ class Assembler:
                 else:
                     yield b
 
-    def assemble(self, filename):
-        labels, discovered, flatten = {}, [], False
+    def relocate(self, tokens, relocations):
+        tokens = list(tokens)
+        position = 0
+        for t in tokens:
+            if isinstance(t, AssemblerDataBlock):                
+                for e in t.data:
+                    if isinstance(e, AssemblerExpression):
+                        relocations[:] += [position]
+                    position += 1
+
+            yield t
+
+    def assemble(self, filename, relocate=False):
+        labels, relocations, discovered, flatten = {}, [], [], False
 
         tokens = self.definitions(self.flatten(filename))
         tokens = self.pack(self.process(tokens))
+            
+        # Flatten tokens, flag parameters as relocating here
+        if relocate:
+            tokens = self.instruct(tokens, flatten=True)
+            tokens = self.relocate(tokens, relocations)
+
         tokens = self.label(tokens, labels, discovered)
         tokens = self.undefined(tokens, discovered)
 
-        # Flatten tokens, flag parameters as relocating here
-
         while True:
+            tokens = self.instruct(tokens, flatten=flatten)
+
+            flatten = True
             tokens = list(tokens)
             if self.finished(tokens): 
                 break
             tokens = self.label(tokens, labels)
             tokens = self.pack(tokens)
             tokens = self.refold(tokens, labels)
-            tokens = self.instruct(tokens, flatten=flatten)
-            flatten = True
 
-        return [b for b in self.data(tokens, words=labels)], labels
+        return [b for b in self.data(tokens, words=labels)], labels, relocations
         
 
 def intelHex(data):
@@ -957,8 +999,9 @@ Options:
 """ % sys.argv[0]
     else:
         a = Assembler()
+        relocate = True
         try:
-            bin, map = a.assemble(sys.argv[-1])
+            bin, map, relocations = a.assemble(sys.argv[-1], relocate=True)
             
             for o in sys.argv[1:-1]:
                 opt, arg = o.split("=")
@@ -971,6 +1014,8 @@ Options:
                     print >>file(arg, "w"), '\n'.join(intelHex(''.join([struct.pack(">H", o) for o in bin])))
                 elif opt == '--dat':
                     print >>file(arg, "w"), '\n'.join(datBlocks(bin))
+                elif opt == '--reloc':
+                    print >>file(arg, "w"), ', '.join([str(s) for s in relocations])
                 else:
                     print "unrecognized option", opt
         except AssemblerException as e:
