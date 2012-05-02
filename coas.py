@@ -2,6 +2,13 @@
 
 import re, os, struct, sys
 
+
+_guidCounter = 0
+def guid():
+    global _guidCounter
+    _guidCounter = _guidCounter + 1
+    return _guidCounter
+
 class AssemblerException(Exception):
     def __init__(self, pos, err):
         self.pos = pos
@@ -40,13 +47,11 @@ class AssemblerMacro:
         if param_count != len(self.args):
             raise AssemblerException(t.pos, "Macro argument count mismatch")
 
-        yield AssemblerMeta(t.pos, '.proc')
         for t in self.terms:
-            e = t.clone()
-            if isinstance(e,AssemblerMeta) or isinstance(e,AssemblerWord):
+            e = t.clone(remap=id(self))
+            if isinstance(e, AssemblerMeta) or isinstance(e, AssemblerWord):
                 e.parameters = [i.fold(words=words) for i in e.parameters]
             yield e
-        yield AssemblerMeta(t.pos, '.endproc')
 
 class AssemblerMeta:
     def __init__(self, pos, name):
@@ -54,9 +59,9 @@ class AssemblerMeta:
         self.name = name
         self.parameters = []
 
-    def clone(self):
+    def clone(self, **kwargs):
         m = AssemblerMeta(self.pos, self.name)
-        m.parameters = [s.clone for s in self.parameters]
+        m.parameters = [s.clone(**kwargs) for s in self.parameters]
         return m
 
     def __str__(self):
@@ -76,7 +81,10 @@ class AssemblerLabel:
         self.name = name
         self.group = -1
 
-    def clone(self):
+    def clone(self, **kwargs):
+        if self.name[0] == '_' and 'remap' in kwargs:
+            return AssemblerLabel(self.pos, "%s:%i" % (self.name, kwargs['remap']))
+
         return self
 
     def __str__(self):
@@ -106,6 +114,8 @@ class AssemblerEOF:
 class AssemblerExpression:
     def fold(self, **kwargs):
         return self
+    def clone(self, **kwargs):
+        return self
 
 class AssemblerUnary(AssemblerExpression):
     def __init__(self, pos, op, term):
@@ -116,8 +126,8 @@ class AssemblerUnary(AssemblerExpression):
         if isinstance(term, AssemblerString) or isinstance(self.term, AssemblerRegister):
             raise AssemblerException(term.pos, "Cannot operate on %s" % term)
 
-    def clone(self):
-        return AssemblerUnary(self.pos, self.operation, self.term.clone())
+    def clone(self, **kwargs):
+        return AssemblerUnary(self.pos, self.operation, self.term.clone(**kwargs))
 
     def fold(self, **kwargs):
         self.term = self.term.fold(**kwargs)
@@ -168,8 +178,8 @@ class AssemblerBinary(AssemblerExpression):
         self.term_a = term_a
         self.term_b = term_b
 
-    def clone(self):
-        return AssemblerBinary(self.pos, self.operation, self.term_a.clone(), self.term_b.clone())
+    def clone(self, **kwargs):
+        return AssemblerBinary(self.pos, self.operation, self.term_a.clone(**kwargs), self.term_b.clone(**kwargs))
 
     def fold(self, **kwargs):
         # Convert subtraction into addition
@@ -211,9 +221,6 @@ class AssemblerNumber(AssemblerExpression):
         self.pos = pos
         self.number = number
 
-    def clone(self):
-        return self
-
     def __str__(self):
         return "%s" % self.number
 
@@ -222,9 +229,6 @@ class AssemblerRegister(AssemblerExpression):
         self.pos = pos
         self.register = reg.lower()
 
-    def clone(self):
-        return self
-
     def __str__(self):
         return 'reg %s' % self.register
 
@@ -232,9 +236,6 @@ class AssemblerString(AssemblerExpression):
     def __init__(self, pos, string):
         self.pos = pos
         self.string = string
-
-    def clone(self):
-        return self
 
     def __str__(self):
         return '"%s"' % self.string.encode("unicode_escape")
@@ -246,9 +247,14 @@ class AssemblerWord(AssemblerExpression):
         self.parameters = []
         self.group = -1
 
-    def clone(self):
-        w = AssemblerWord(self.pos, self.word)
-        w.parameters = [s.clone() for s in self.parameters]
+    def clone(self, **kwargs):
+        if self.word[0] == '_' and 'remap' in kwargs:
+            word = "%s:%i" % (self.word, kwargs['remap'])
+        else:
+            word = self.word
+
+        w = AssemblerWord(self.pos, word)
+        w.parameters = [s.clone(**kwargs) for s in self.parameters]
         return w
 
     def fold(self, **kwargs):
@@ -276,8 +282,8 @@ class AssemblerIndirect(AssemblerExpression):
         self.pos = pos
         self.term = term
 
-    def clone(self):
-        return AssemblerIndirect(self.pos, self.term.clone())
+    def clone(self, **kwargs):
+        return AssemblerIndirect(self.pos, self.term.clone(**kwargs))
 
     def fold(self, **kwargs):
         self.term = self.term.fold(**kwargs)
@@ -289,8 +295,8 @@ class AssemblerIndirect(AssemblerExpression):
 class AssemblerParameterList:
     def __init__(self, *kargs):
         self.list = list(kargs)
-    def clone(self):
-        return AssemblerParameterList(*[s.clone() for s in self.list])
+    def clone(self, **kwargs):
+        return AssemblerParameterList(*[s.clone(**kwargs) for s in self.list])
     def add(self, e):
         self.list += [e]
     def fold(self, **kwargs):
@@ -817,7 +823,7 @@ class Assembler:
         for t in [t for t in tokens]:
             def validate(w):
                 if not w in discovered:
-                    raise AssemblerException(t.pos, "Undefined term %s" % w)
+                    raise AssemblerException(t.pos, "Undefined term %s" % str(w))
                     
             if isinstance(t, AssemblerWord):
                 for p in t.parameters:
@@ -853,6 +859,10 @@ class Assembler:
 
         tokens = self.flatten(filename)
         tokens = self.definitions(tokens)
+        tokens = [t for t in tokens]
+        for t in tokens:
+            print t
+
         tokens = self.pack(self.process(tokens))
         tokens = self.undefined(self.label([t for t in tokens], labels, discovered), discovered)
         tokens = self.instruct(self.refold(self.pack(self.label([t for t in tokens], labels)), labels))
