@@ -146,7 +146,10 @@ class AssemblerNumber(AssemblerExpression):
         self.pos = pos
         self.number = number
 
-    def containsWords(self):
+    def hasTerms(self):
+        return False
+
+    def relocatible(self):
         return False
 
     def __str__(self):
@@ -157,8 +160,11 @@ class AssemblerRegister(AssemblerExpression):
         self.pos = pos
         self.register = reg.lower()
 
-    def containsWords(self):
-        return True
+    def hasTerms(self):
+        return False
+
+    def relocatible(self):
+        return False
 
     def __str__(self):
         return 'reg %s' % self.register
@@ -168,6 +174,12 @@ class AssemblerWord(AssemblerExpression):
         self.pos = pos
         self.word = word.lower()
         self.parameters = []
+
+    def hasTerms(self):
+        return True
+
+    def relocatible(self):
+        return True
 
     def setGroup(self, group):
         for p in self.parameters:
@@ -210,6 +222,12 @@ class AssemblerUnary(AssemblerExpression):
 
         if isinstance(term, AssemblerString) or isinstance(self.term, AssemblerRegister):
             raise AssemblerException(term.pos, "Cannot operate on %s" % term)
+
+    def hasTerms(self):
+        return self.term.hasTerms()
+
+    def relocatible(self):
+        return not self.term.hasTerms()
 
     def setGroup(self, group):
         self.term.setGroup(group)
@@ -273,6 +291,18 @@ class AssemblerBinary(AssemblerExpression):
 
         self.term_a = term_a
         self.term_b = term_b
+
+    def hasTerms(self):
+        return self.term_a.hasTerms() or self.term_b.hasTerms()
+
+    def relocatible(self):
+        if self.operation != '+':
+            return False
+    
+        if (self.term_a.hasTerms(), self.term_b.hasTerms()) in [(True, True), (False, False)]:
+            return False
+    
+        return True
 
     def setGroup(self, group):
         self.term_a.setGroup(group)
@@ -539,18 +569,22 @@ class Assembler:
                 raise AssemblerException(token.pos, "Unexpected %s" % token)
 
     def binary(self, pos, type, data):
-        if type in ['.big', '.little'] and len(data) & 1:
-            data += [0]
+        if type in ['.big', '.little']:
+            # Round up
+            if len(data) & 1:
+                data += [AssemblerNumber(None, 0)]
 
-        def pack(c):
-            return (c[0] & 0xFF) | (c[1] << 8)
+            if type == '.big':
+                little, big = data[1::2], data[::2]
+            elif type == '.little':
+                little, big = data[::2], data[1::2]
 
-        if type == '.big':
-            data = [pack(c[::-1]) for c in chunks(data, 2)]
-        elif type == '.little':
-            data = [pack(c) for c in chunks(data, 2)]
+            data = [AssemblerBinary(l.pos, '|', 
+                    AssemblerBinary(l.pos, '<<', big[i], AssemblerNumber(l.pos, 8)),
+                    AssemblerBinary(l.pos, '&', l, AssemblerNumber(l.pos, 0xFF)))
+                    for i, l in enumerate(little)]
 
-        return AssemblerDataBlock(pos, [d & 0xFFFF for d in data])
+        return AssemblerDataBlock(pos, data)
 
     """Flatten assembly, handles include, incbytes, incbig, inclittle"""
     def flatten(self, source):
@@ -700,11 +734,7 @@ class Assembler:
         for t in tokens:
             if isinstance(t, AssemblerMeta) and t.name in ['.big', '.little', '.data']:
                 data = t.parameters[0].list
-                if not min([isinstance(i,AssemblerNumber) for i in data]):
-                    yield t
-                    continue
-
-                binary = self.binary(t.pos, t.name, [d.number for d in data])
+                binary = self.binary(t.pos, t.name, [d for d in data])
                 yield binary
             else:
                 yield t
@@ -924,7 +954,7 @@ class Assembler:
         for t in tokens:
             if isinstance(t, AssemblerDataBlock):                
                 for e in t.data:
-                    if isinstance(e, AssemblerExpression):
+                    if isinstance(e, AssemblerExpression) and e.relocatible():
                         relocations[:] += [position]
                     position += 1
 
@@ -998,13 +1028,12 @@ Options:
   --dat=filename      Output as a notch-style DAT assembly
 """ % sys.argv[0]
     else:
+        parameters = dict(a.split("=") for a in sys.argv[1:-1])
         a = Assembler()
-        relocate = True
         try:
-            bin, map, relocations = a.assemble(sys.argv[-1], relocate=True)
+            bin, map, relocations = a.assemble(sys.argv[-1], relocate=('--reloc' in parameters))
             
-            for o in sys.argv[1:-1]:
-                opt, arg = o.split("=")
+            for opt, arg in parameters.items():
 
                 if opt == '--output':
                     print >>file(arg, "wb"), ''.join([struct.pack(">H", o) for o in bin])

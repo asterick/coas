@@ -7,6 +7,8 @@
 _ref:
 .endmacro
 
+.data "Hello World"
+
 .proc
 reset:  JSR setup_screen
         SET B, 0
