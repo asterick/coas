@@ -1,7 +1,4 @@
-#!/usr/bin/python
-
-import re, os, struct, sys
-
+import re, os, struct
 
 _guidCounter = 0
 def guid():
@@ -1040,40 +1037,3 @@ def mapping(words):
     for k, v in words.items():
         if isinstance(k, basestring):
             yield "%s\t%s" % (k, v)
-
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print """
-Usage: %s [options] <input.src>
-Options:
-  --list=filename     Output mapping file
-  --hex=filename      Output as a hex file
-  --output=filename   Output as a big-endian binary
-  --dat=filename      Output as a notch-style DAT assembly
-  --verilog=filename  Output as verilog initialization format
-""" % sys.argv[0]
-    else:
-        parameters = dict(a.split("=") for a in sys.argv[1:-1])
-        a = Assembler()
-        try:
-            data, lableMap, relocations = a.assemble(sys.argv[-1], relocate=('--reloc' in parameters))
-            
-            for opt, arg in parameters.items():
-
-                if opt == '--list':
-                    print >>file(arg, "w"), '\n'.join(mapping(lableMap))
-                elif opt == '--reloc':
-                    print >>file(arg, "w"), ', '.join([str(s) for s in relocations])
-                elif opt == '--output':
-                    print >>file(arg, "wb"), binaryOutput(data)
-                elif opt == '--hex':
-                    print >>file(arg, "w"), '\n'.join(intelHex(data))
-                elif opt == '--dat':
-                    print >>file(arg, "w"), ''.join(datOutput(data))
-                elif opt == '--verilog':
-                    print >>file(arg, "w"), "@0000\n%s\n" % ''.join(verilog(data))
-                else:
-                    print "unrecognized option", opt
-
-        except AssemblerException as e:
-            print e 

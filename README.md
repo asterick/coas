@@ -83,3 +83,20 @@ Creates local scoping, making any label beginning with '_' only be visible insid
 
 `.macro word arg, arg, arg  ... .endmacro`
 
+
+Installation Instructions
+-------------------------
+
+If you just want to run it:
+
+````
+pip install git+git://github.com/asterick/coas.git
+````
+
+For development:
+
+````
+git clone git://github.com/asterick/coas.git
+# install it as editable
+pip install -e coas
+````
