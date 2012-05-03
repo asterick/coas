@@ -379,6 +379,38 @@ def chunks(l, n):
         yield l[i:i+n]
 
 class Assembler:
+    TWO_FORM = {
+        'SET': 0x01, 'ADD': 0x02, 'SUB': 0x03, 'MUL': 0x04,
+        'MLI': 0x05, 'DIV': 0x06, 'DVI': 0x07, 'MOD': 0x08,
+        'MDI': 0x09, 'AND': 0x0a, 'BOR': 0x0b, 'XOR': 0x0c,
+        'SHR': 0x0d, 'ASR': 0x0e, 'SHL': 0x0f, 'IFB': 0x10,
+        'IFC': 0x11, 'IFE': 0x12, 'IFN': 0x13, 'IFG': 0x14,
+        'IFA': 0x15, 'IFL': 0x16, 'IFU': 0x17, 'ADX': 0x1a,
+        'SBX': 0x1b, 'STI': 0x1e, 'STD': 0x1f
+    }
+
+    ONE_FORM = {
+        'JSR': 0x01, 'INT': 0x08, 'IAG': 0x09, 'IAS': 0x0a,
+        'RFI': 0x0b, 'IAQ': 0x0c, 'HWN': 0x10, 'HWQ': 0x11,
+        'HWI': 0x12
+    }
+    
+    REG_FIELD = {
+        'a': 0, 'b': 1, 'c': 2, 'x': 3, 'y': 4, 'z': 5, 'i': 6, 'j': 7,
+        'sp': 0x1b, 'pc': 0x1c, 'ex': 0x1d, 
+        'peek': 0x19, 'push':0x18, 'pop': 0x18
+    }
+
+    IND_REG = {
+        'a': 0x8, 'b': 0x9, 'c': 0xa, 'x': 0xb, 'y': 0xc, 'z': 0xd, 'i': 0xe, 'j': 0xf,
+        'sp': 0x19
+    }
+
+    IND_REG_OFF = {
+        'a': 0x10, 'b': 0x11, 'c': 0x12, 'x': 0x13, 'y': 0x14, 'z': 0x15, 'i': 0x16, 'j': 0x17,
+        'sp': 0x1a
+    }
+
     FLAGS = re.X|re.U|re.I
     RADIX = {'hex_a': 16, 'oct': 8, 'dec': 10, 'bin_a': 2, 'bin_b': 2}
     UNARY = ["-","~"]
@@ -804,38 +836,6 @@ class Assembler:
             yield self.equate(t, words)
 
     """ Convert complete instructions into binaries """
-    TWO_FORM = {
-        'SET': 0x01, 'ADD': 0x02, 'SUB': 0x03, 'MUL': 0x04,
-        'MLI': 0x05, 'DIV': 0x06, 'DVI': 0x07, 'MOD': 0x08,
-        'MDI': 0x09, 'AND': 0x0a, 'BOR': 0x0b, 'XOR': 0x0c,
-        'SHR': 0x0d, 'ASR': 0x0e, 'SHL': 0x0f, 'IFB': 0x10,
-        'IFC': 0x11, 'IFE': 0x12, 'IFN': 0x13, 'IFG': 0x14,
-        'IFA': 0x15, 'IFL': 0x16, 'IFU': 0x17, 'ADX': 0x1a,
-        'SBX': 0x1b, 'STI': 0x1e, 'STD': 0x1f
-    }
-
-    ONE_FORM = {
-        'JSR': 0x01, 'INT': 0x08, 'IAG': 0x09, 'IAS': 0x0a,
-        'RFI': 0x0b, 'IAQ': 0x0c, 'HWN': 0x10, 'HWQ': 0x11,
-        'HWI': 0x12
-    }
-    
-    REG_FIELD = {
-        'a': 0, 'b': 1, 'c': 2, 'x': 3, 'y': 4, 'z': 5, 'i': 6, 'j': 7,
-        'sp': 0x1b, 'pc': 0x1c, 'ex': 0x1d, 
-        'peek': 0x19, 'push':0x18, 'pop': 0x18
-    }
-
-    IND_REG = {
-        'a': 0x8, 'b': 0x9, 'c': 0xa, 'x': 0xb, 'y': 0xc, 'z': 0xd, 'i': 0xe, 'j': 0xf,
-        'sp': 0x19
-    }
-
-    IND_REG_OFF = {
-        'a': 0x10, 'b': 0x11, 'c': 0x12, 'x': 0x13, 'y': 0x14, 'z': 0x15, 'i': 0x16, 'j': 0x17,
-        'sp': 0x1a
-    }
-
     def getField(self, exp, **kwargs):
         if isinstance(exp, AssemblerRegister):
             return self.REG_FIELD[exp.register], None
@@ -866,6 +866,13 @@ class Assembler:
                 return self.IND_REG[exp.term.register], None
             elif isinstance(exp.term, AssemblerNumber):
                 return (0x1e, exp.term.number & 0xFFFF)
+            elif isinstance(exp.term, AssemblerWord):
+                    if not 'flatten' in kwargs:
+                        return None
+                    else:
+                        return (0x1e, exp.term)
+            else:
+                raise AssemblerException(exp.pos, "Unexpected %s" % exp.term)
         elif isinstance(exp, AssemblerNumber):
             num = exp.number & 0xFFFF
         
