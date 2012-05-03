@@ -4,7 +4,6 @@ import sys
 from coas import (Assembler, AssemblerException, intelHex, mapping,
     binaryOutput, datOutput, verilog)
 
-
 if len(sys.argv) < 2:
     print """
 Usage: %s [options] <input.src>

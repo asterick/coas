@@ -853,10 +853,16 @@ class Assembler:
                     if not 'flatten' in kwargs:
                         return None
                     else:
+                        if not a.register in self.IND_REG_OFF:
+                            throw AssemblerException(a.pos, "%s cannot be indirectly indexed" % a)
                         return (self.IND_REG_OFF[a.register], b)
 
+                if not a.register in self.IND_REG_OFF:
+                    throw AssemblerException(a.pos, "%s cannot be indirectly indexed" % a)
                 return (self.IND_REG_OFF[a.register], b.number & 0xFFFF)
             elif isinstance(exp.term, AssemblerRegister):
+                if not a.register in self.IND_REG:
+                    throw AssemblerException(a.pos, "%s cannot be used as an indexor" % a)
                 return self.IND_REG[exp.term.register], None
             elif isinstance(exp.term, AssemblerNumber):
                 return (0x1e, exp.term.number & 0xFFFF)
