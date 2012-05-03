@@ -25,6 +25,10 @@ class ExpressionToken:
     def __str__(self):
         return "%s token '%s'" % (self.category, self.token)
 
+class AssemblerAnnotation:
+    def __init__(self, pos):
+        self.pos = pos
+
 class AssemblerMacro:
     def __init__(self, name, args, terms):
         for a in args:
@@ -80,6 +84,7 @@ class AssemblerMeta:
 
 class AssemblerDataBlock:
     def __init__(self, pos, data):
+        self.pos = pos
         self.data = data
     def add(self, data):
         self.data += data
@@ -420,7 +425,7 @@ class Assembler:
         source = file(filename,"r").read().decode('utf8')
         for line_num, line in enumerate(source.splitlines()):
             for m in self.TOKENS.finditer(line):
-                pos, token = (filename, line_num, m.start(0)), m.groupdict()
+                pos, token = (filename, line_num, m.start(0), line), m.groupdict()
 
                 # Exceptional tokens
                 if token['comment']:
@@ -933,6 +938,18 @@ class Assembler:
                 return False
         return True
 
+    def relocate(self, tokens, relocations):
+        tokens = list(tokens)
+        position = 0
+        for t in tokens:
+            if isinstance(t, AssemblerDataBlock):                
+                for e in t.data:
+                    if isinstance(e, AssemblerExpression) and e.relocatible():
+                        relocations[:] += [position]
+                    position += 1
+
+            yield t
+
     def data(self, tokens, words):
         for t in tokens:
             if isinstance(t, AssemblerMeta) and t.name in ['.org', '.bss']:
@@ -947,18 +964,7 @@ class Assembler:
                         raise AssemblerException(b.pos, "Could not evaluate to a number")
                 else:
                     yield b
-
-    def relocate(self, tokens, relocations):
-        tokens = list(tokens)
-        position = 0
-        for t in tokens:
-            if isinstance(t, AssemblerDataBlock):                
-                for e in t.data:
-                    if isinstance(e, AssemblerExpression) and e.relocatible():
-                        relocations[:] += [position]
-                    position += 1
-
-            yield t
+            yield AssemblerAnnotation(t.pos)
 
     def assemble(self, filename, relocate=False):
         labels, relocations, discovered, flatten = {}, [], [], False
@@ -986,9 +992,15 @@ class Assembler:
             tokens = self.refold(tokens, labels)
 
         return [b for b in self.data(tokens, words=labels)], labels, relocations
-        
+
+# ---- OUTPUT FORMATS
+
+def binaryOutput(data):
+    return ''.join([struct.pack(">H", o) for o in data if not isinstance(o, AssemblerAnnotation)])
 
 def intelHex(data):
+    data = ''.join([struct.pack(">H", o) for o in bin if not isinstance(o, AssemblerAnnotation)])
+
     chunkSize = 32
     def chunk(c):
         for i in range(0,len(c),chunkSize):
@@ -1003,14 +1015,26 @@ def intelHex(data):
         yield format(addr * chunkSize, 0, block)
     yield format(0,1)
 
-def datBlocks(data):
-    chunkSize = 8
-    def chunk(c):
-        for i in range(0,len(c),chunkSize):
-            yield c[i:i+chunkSize]
+def datOutput(data):
+    leadIn = False
+    for k in data:
+        if not leadIn:
+            yield ".dat "
+            leadIn = True
 
-    for addr, block in enumerate(chunk(data)):
-        yield "dat %s ; %x" % (', '.join(["%6s" % hex(o) for o in block]), addr*chunkSize)
+        
+        if isinstance(k, AssemblerAnnotation):
+            yield "; %s\n" % k.pos[3]
+            leadIn = False
+        else:
+            yield "%i " % k
+
+def verilog(data):
+    for k in data:
+        if isinstance(k, AssemblerAnnotation):
+            yield "// %s" % k.pos[3]
+        else:
+            yield ("%4x" % k).replace(" ","0")
 
 def mapping(words):
     for k, v in words.items():
@@ -1036,19 +1060,20 @@ Options:
             
             for opt, arg in parameters.items():
 
-                if opt == '--output':
-                    print >>file(arg, "wb"), ''.join([struct.pack(">H", o) for o in bin])
-                elif opt == '--list':
+                if opt == '--list':
                     print >>file(arg, "w"), '\n'.join(mapping(map))
-                elif opt == '--hex':
-                    print >>file(arg, "w"), '\n'.join(intelHex(''.join([struct.pack(">H", o) for o in bin])))
-                elif opt == '--dat':
-                    print >>file(arg, "w"), '\n'.join(datBlocks(bin))
-                elif opt == '--verilog':
-                    print >>file(arg, "w"), "@0000\n%s" % '\n'.join([("%4x" % o).replace(" ","0") for o in bin])
                 elif opt == '--reloc':
                     print >>file(arg, "w"), ', '.join([str(s) for s in relocations])
+                elif opt == '--output':
+                    print >>file(arg, "wb"), binaryOutput(bin)
+                elif opt == '--hex':
+                    print >>file(arg, "w"), '\n'.join(intelHex(bin))
+                elif opt == '--dat':
+                    print >>file(arg, "w"), ''.join(datOutput(bin))
+                elif opt == '--verilog':
+                    print >>file(arg, "w"), "@0000\n%s" % '\n'.join(verilog(bin))
                 else:
                     print "unrecognized option", opt
+
         except AssemblerException as e:
             print e 
