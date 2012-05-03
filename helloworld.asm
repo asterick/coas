@@ -21,8 +21,6 @@ _loop:  SET [B], [A]
 
 crash:  jmp crash
 
-data: .data "Hello World", 0
-
 .proc
 setup_screen:
         HWN I
@@ -44,4 +42,8 @@ _loop:  SUB I, 1
         JMP _loop
 .endproc
 
+; === DATA SECTION
+data: .data "Hello World", 0
+
+; === UNINTIALIZED SECTION 
 screen: .bss 0x180

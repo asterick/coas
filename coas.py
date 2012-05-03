@@ -1021,16 +1021,16 @@ def intelHex(data):
 def datOutput(data):
     leadIn = False
     for k in data:
+        if isinstance(k, AssemblerAnnotation):
+            yield "; %s\n" % k.pos[3]
+            leadIn = False
+            continue 
+
         if not leadIn:
             yield "DAT "
             leadIn = True
 
-        
-        if isinstance(k, AssemblerAnnotation):
-            yield "; %s\n" % k.pos[3]
-            leadIn = False
-        else:
-            yield "%i " % k
+        yield ("0x%4x" % k).replace(" ","0") + " "
 
 def verilog(data):
     for k in data:
