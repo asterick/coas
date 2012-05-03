@@ -1026,6 +1026,7 @@ Options:
   --hex=filename      Output as a hex file
   --output=filename   Output as a big-endian binary
   --dat=filename      Output as a notch-style DAT assembly
+  --verilog=filename  Output as verilog initialization format
 """ % sys.argv[0]
     else:
         parameters = dict(a.split("=") for a in sys.argv[1:-1])
@@ -1043,6 +1044,8 @@ Options:
                     print >>file(arg, "w"), '\n'.join(intelHex(''.join([struct.pack(">H", o) for o in bin])))
                 elif opt == '--dat':
                     print >>file(arg, "w"), '\n'.join(datBlocks(bin))
+                elif opt == '--verilog':
+                    print >>file(arg, "w"), "@0000\n%s" % '\n'.join([("%4x" % o).replace(" ","0") for o in bin])
                 elif opt == '--reloc':
                     print >>file(arg, "w"), ', '.join([str(s) for s in relocations])
                 else:
