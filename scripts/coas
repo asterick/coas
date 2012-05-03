@@ -19,22 +19,22 @@ else:
     parameters = dict(a.split("=") for a in sys.argv[1:-1])
     a = Assembler()
     try:
-        bin, map, relocations = a.assemble(sys.argv[-1], relocate=('--reloc' in parameters))
+        data, lableMap, relocations = a.assemble(sys.argv[-1], relocate=('--reloc' in parameters))
         
         for opt, arg in parameters.items():
 
             if opt == '--list':
-                print >>file(arg, "w"), '\n'.join(mapping(map))
+                print >>file(arg, "w"), '\n'.join(mapping(lableMap))
             elif opt == '--reloc':
                 print >>file(arg, "w"), ', '.join([str(s) for s in relocations])
             elif opt == '--output':
-                print >>file(arg, "wb"), binaryOutput(bin)
+                print >>file(arg, "wb"), binaryOutput(data)
             elif opt == '--hex':
-                print >>file(arg, "w"), '\n'.join(intelHex(bin))
+                print >>file(arg, "w"), '\n'.join(intelHex(data))
             elif opt == '--dat':
-                print >>file(arg, "w"), ''.join(datOutput(bin))
+                print >>file(arg, "w"), ''.join(datOutput(data))
             elif opt == '--verilog':
-                print >>file(arg, "w"), "@0000\n%s\n" % ''.join(verilog(bin))
+                print >>file(arg, "w"), "@0000\n%s\n" % ''.join(verilog(data))
             else:
                 print "unrecognized option", opt
 
