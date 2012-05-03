@@ -854,15 +854,15 @@ class Assembler:
                         return None
                     else:
                         if not a.register in self.IND_REG_OFF:
-                            throw AssemblerException(a.pos, "%s cannot be indirectly indexed" % a)
+                            raise AssemblerException(a.pos, "%s cannot be indirectly indexed" % a)
                         return (self.IND_REG_OFF[a.register], b)
 
                 if not a.register in self.IND_REG_OFF:
-                    throw AssemblerException(a.pos, "%s cannot be indirectly indexed" % a)
+                    raise AssemblerException(a.pos, "%s cannot be indirectly indexed" % a)
                 return (self.IND_REG_OFF[a.register], b.number & 0xFFFF)
             elif isinstance(exp.term, AssemblerRegister):
-                if not a.register in self.IND_REG:
-                    throw AssemblerException(a.pos, "%s cannot be used as an indexor" % a)
+                if not exp.term.register in self.IND_REG:
+                    raise AssemblerException(exp.term.pos, "%s cannot be used as an indexor" % exp.term)
                 return self.IND_REG[exp.term.register], None
             elif isinstance(exp.term, AssemblerNumber):
                 return (0x1e, exp.term.number & 0xFFFF)
@@ -1022,7 +1022,7 @@ def datOutput(data):
     leadIn = False
     for k in data:
         if not leadIn:
-            yield ".dat "
+            yield "DAT "
             leadIn = True
 
         

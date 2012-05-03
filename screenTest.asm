@@ -7,24 +7,21 @@
 _ref:
 .endmacro
 
-.data "Hello World"
-
 .proc
 reset:  JSR setup_screen
-        SET B, 0
-        SET A, 0xC900
-        SET A, [A]
-_loop:  SET [B+screen], A
+        SET B, screen
+        SET A, data
+_loop:  SET [B], [A]
+        BOR [B], $C000
         ADD B, 1
         ADD A, 1
-        SET C, A
-        AND C, 0x80
-        ADD A, C
-        IFN B, 0x180
+        IFN [A], 0
             JMP _loop
 .endproc
 
 crash:  jmp crash
+
+data: .data "Hello World", 0
 
 .proc
 setup_screen:
@@ -44,17 +41,7 @@ _loop:  SUB I, 1
         SET A, 0
         SET B, screen
         HWI I
-
-        ; Set character mapping
-        SET A, 1
-        SET B, char
-        HWI I
-        SET A, 4
-        SET B, char
-        HWI I
-        
         JMP _loop
 .endproc
 
 screen: .bss 0x180
-char:   .bss 0x100
