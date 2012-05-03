@@ -6,6 +6,6 @@ setup(
     name = "coas",
     version = "0.00.0dev",
     author = "asterick",
-    modules = ["coas.py"],
+    py_modules = ["coas"],
     scripts = glob("scripts/*"),
 )
