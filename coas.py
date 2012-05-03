@@ -1032,9 +1032,9 @@ def datOutput(data):
 def verilog(data):
     for k in data:
         if isinstance(k, AssemblerAnnotation):
-            yield "// %s" % k.pos[3]
+            yield "// %s\n" % k.pos[3]
         else:
-            yield ("%4x" % k).replace(" ","0")
+            yield ("%4x" % k).replace(" ","0") + " "
 
 def mapping(words):
     for k, v in words.items():
@@ -1071,7 +1071,7 @@ Options:
                 elif opt == '--dat':
                     print >>file(arg, "w"), ''.join(datOutput(bin))
                 elif opt == '--verilog':
-                    print >>file(arg, "w"), "@0000\n%s" % '\n'.join(verilog(bin))
+                    print >>file(arg, "w"), "@0000\n%s\n" % ''.join(verilog(bin))
                 else:
                     print "unrecognized option", opt
 
