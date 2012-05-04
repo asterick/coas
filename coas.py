@@ -788,9 +788,8 @@ class Assembler:
                     if offset:
                         yield AssemblerDataBlock(t.pos, [0]*(num.number-offset))
                 else:
-                    position = None
-                    yield t
-                    continue
+                    raise AssemblerException(t.pos, "Long-term evaluation of %s is not allowed for align statements" % t)
+
             elif isinstance(t, AssemblerMeta) and t.name in ['.org', '.bss']:
                 if len(t.parameters) != 1 or len(t.parameters[0].list) != 1:
                     raise AssemblerException("Malformed expression %s" % t)
