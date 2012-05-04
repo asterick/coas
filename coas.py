@@ -206,7 +206,7 @@ class AssemblerWord(AssemblerExpression):
             kwargs['validate'](word)
 
         if ('words' in kwargs) and (word in kwargs['words']):
-            return kwargs['words'][word].clone()
+            return kwargs['words'][word].clone().fold(**kwargs)
 
         return self
 
