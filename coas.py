@@ -840,39 +840,21 @@ class Assembler:
         if isinstance(exp, AssemblerRegister):
             return self.REG_FIELD[exp.register], None
         elif isinstance(exp, AssemblerIndirect):
-            if isinstance(exp.term, AssemblerBinary):
+            if isinstance(exp.term, AssemblerBinary) and exp.term.operation == '+' and isinstance(a, AssemblerRegister):
                 op, a, b = exp.term.operation, exp.term.term_a, exp.term.term_b
 
-                if op != '+':
-                    return None
-
-                if not isinstance(a, AssemblerRegister):
-                    return None
-
-                if not isinstance(b, AssemblerNumber):
-                    if not 'flatten' in kwargs:
-                        return None
-                    else:
-                        if not a.register in self.IND_REG_OFF:
-                            raise AssemblerException(a.pos, "%s cannot be indirectly indexed" % a)
-                        return (self.IND_REG_OFF[a.register], b)
-
+                # This can always be flatted, we do not provide a short literal
                 if not a.register in self.IND_REG_OFF:
                     raise AssemblerException(a.pos, "%s cannot be indirectly indexed" % a)
-                return (self.IND_REG_OFF[a.register], b.number & 0xFFFF)
+                return (self.IND_REG_OFF[a.register], b)
+
             elif isinstance(exp.term, AssemblerRegister):
                 if not exp.term.register in self.IND_REG:
                     raise AssemblerException(exp.term.pos, "%s cannot be used as an indexor" % exp.term)
                 return self.IND_REG[exp.term.register], None
-            elif isinstance(exp.term, AssemblerNumber):
-                return (0x1e, exp.term.number & 0xFFFF)
-            elif isinstance(exp.term, AssemblerWord):
-                    if not 'flatten' in kwargs:
-                        return None
-                    else:
-                        return (0x1e, exp.term)
-            else:
-                raise AssemblerException(exp.pos, "Unexpected %s" % exp.term)
+
+            # Indirct can always be flattened, no short form
+            return (0x1e, exp.term)
         elif isinstance(exp, AssemblerNumber):
             num = exp.number & 0xFFFF
         
@@ -981,7 +963,12 @@ class Assembler:
 
         tokens = self.definitions(self.flatten(filename))
         tokens = self.pack(self.process(tokens))
-            
+        tokens = self.instruct(tokens)
+
+        tokens = list(tokens)
+        for t in tokens:
+            print t
+
         # Flatten tokens, flag parameters as relocating here
         if relocate:
             tokens = self.instruct(tokens, flatten=True)
