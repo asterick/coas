@@ -148,6 +148,9 @@ class AssemblerNumber(AssemblerExpression):
         self.pos = pos
         self.number = number
 
+    def calculate(self, words):
+        return self.number
+
     def hasTerms(self):
         return False
 
@@ -176,6 +179,9 @@ class AssemblerWord(AssemblerExpression):
         self.pos = pos
         self.word = word.lower()
         self.parameters = []
+
+    def calculate(self, words):
+        return words[self.words]
 
     def hasTerms(self):
         return True
@@ -235,16 +241,20 @@ class AssemblerUnary(AssemblerExpression):
     def clone(self, **kwargs):
         return AssemblerUnary(self.pos, self.operation, self.term.clone(**kwargs))
 
+
+    def calculate(self, words):
+        if self.operation == '-':
+            return AssemblerNumber(self.pos, -self.term.number)
+        elif self.operation == '~':
+            return AssemblerNumber(self.pos, ~self.term.number)
+
     def fold(self, **kwargs):
         self.term = self.term.fold(**kwargs)
 
         if not isinstance(self.term, AssemblerNumber):
             return self
 
-        if self.operation == '-':
-            return AssemblerNumber(self.pos, -self.term.number)
-        elif self.operation == '~':
-            return AssemblerNumber(self.pos, ~self.term.number)
+        return self.calculate(None)
 
     def __str__(self):
         return "%s%s" % (self.operation, self.term)
@@ -311,6 +321,10 @@ class AssemblerBinary(AssemblerExpression):
     def clone(self, **kwargs):
         return AssemblerBinary(self.pos, self.operation, self.term_a.clone(**kwargs), self.term_b.clone(**kwargs))
 
+    def calculate(self, words):
+        a, b = self.term_a.number, self.term_b.number
+        return self.OPERATION[self.operation](a, b)
+
     def fold(self, **kwargs):
         self.term_a = self.term_a.fold(**kwargs)
         self.term_b = self.term_b.fold(**kwargs)
@@ -333,10 +347,9 @@ class AssemblerBinary(AssemblerExpression):
 
             return self
 
-        a, b = self.term_a.number, self.term_b.number
         pos = self.term_a.pos
 
-        return AssemblerNumber(pos, self.OPERATION[self.operation](a, b))
+        return AssemblerNumber(pos, self.calculate(None))
 
     def __str__(self):
         return "(%s %s %s)" % (self.term_a, self.operation, self.term_b)
@@ -837,7 +850,7 @@ class Assembler:
             yield self.equate(t, words)
 
     """ Convert complete instructions into binaries """
-    def getField(self, exp, flatten=False, **kwargs):
+    def getField(self, exp, allowLiteral=True, flatten=False, **kwargs):
         if isinstance(exp, AssemblerRegister):
             return self.REG_FIELD[exp.register], None
         elif isinstance(exp, AssemblerIndirect):
@@ -856,7 +869,12 @@ class Assembler:
 
             # Indirct can always be flattened, no short form
             return (0x1e, exp.term)
-        elif isinstance(exp, AssemblerNumber):
+
+        if not allowLiteral:
+            raise AssemblerException(exp.pos, "Field B cannot be a literal number")
+
+        if isinstance(exp, AssemblerNumber):
+
             num = exp.number & 0xFFFF
         
             if num >= -1 and num <= 30:
@@ -884,7 +902,7 @@ class Assembler:
                         raise AssemblerException(t.pos, "Malformed Expression %s" % t)
 
                     field_o = self.TWO_FORM[name]
-                    field_b = self.getField(t.parameters[0].list[0], **kwargs)
+                    field_b = self.getField(t.parameters[0].list[0], allowLiteral=False, **kwargs)
                     field_a = self.getField(t.parameters[0].list[1], **kwargs)
                 else:
                     raise AssemblerException(t.pos, "Unrecognized operation %s" % t)
@@ -959,6 +977,12 @@ class Assembler:
                     yield b
             yield AssemblerAnnotation(t.pos)
 
+    def estimate(self, tokens):
+        print "---"
+        for t in tokens:
+            print t
+            yield t
+
     def assemble(self, filename, relocate=False):
         labels, relocations, discovered, flatten = {}, [], [], False
 
@@ -970,15 +994,15 @@ class Assembler:
         if relocate:
             tokens = self.relocate(tokens, relocations)
 
-        while True:
+        tokens = list(tokens)
+        while not self.finished(tokens):
             tokens = self.label(tokens, labels)
             tokens = self.refold(tokens, labels)
             tokens = self.instruct(tokens, flatten=flatten)
-
-            flatten = True
             tokens = list(tokens)
-            if self.finished(tokens): 
-                break
+            flatten = True
+
+            tokens = self.estimate(tokens)
 
         return [b for b in self.data(tokens, words=labels)], labels, relocations
 
