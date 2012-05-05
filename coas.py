@@ -774,7 +774,7 @@ class Assembler:
                 yield t
 
     def label(self, tokens, words, discovered = []):
-        position, tokens = 0, list(tokens)
+        position, reference, tokens = 0, None, list(tokens)
         for t in tokens:
             if isinstance(t, AssemblerMeta) and t.name in ['.align']:
                 if len(t.parameters) != 1 or len(t.parameters[0].list) != 1:
@@ -807,7 +807,7 @@ class Assembler:
                     if position != None:
                         position += num.number
                 else:
-                    position = num.number
+                    position, reference = num.number, None
             elif isinstance(t, AssemblerDataBlock):
                 if position != None:
                     position += len(t.data)
@@ -818,15 +818,19 @@ class Assembler:
                 discovered[:] += [word]
 
                 if position == None:
+                    reference, position = t, 0
                     yield t
                     continue
 
                 if word in words:
                     raise AssemblerException(t.pos, "Label redefinition %s" % t)
 
-                words[word] = AssemblerNumber(t.pos, position)
+                if reference == None:
+                    words[word] = AssemblerNumber(t.pos, position)
+                else:
+                    words[word] = AssemblerBinary(t.pos, '+', AssemblerWord(t.pos, reference.name), AssemblerNumber(t.pos, position))
             else:
-                position = None
+                position, reference = None, None
                 yield t
 
     """ Attempt to stuff words into their respective areas """
@@ -964,17 +968,25 @@ class Assembler:
         tokens = self.pack(self.process(tokens))
         tokens = self.instruct(tokens)
 
-        tokens = list(tokens)
-        for t in tokens:
-            print t
-
         # Flatten tokens, flag parameters as relocating here
         if relocate:
             tokens = self.instruct(tokens, flatten=True)
             tokens = self.relocate(tokens, relocations)
 
+        tokens = list(tokens)
+        print "-----"
+        for t in tokens:
+            print t
+
+        tokens = list(tokens)
+        print "-----"
         tokens = self.label(tokens, labels, discovered)
         tokens = self.undefined(tokens, discovered)
+
+        tokens = list(tokens)
+        print "-----"
+        for t in tokens:
+            print t
 
         while True:
             tokens = self.instruct(tokens, flatten=flatten)
