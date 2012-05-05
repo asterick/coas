@@ -200,13 +200,11 @@ class AssemblerWord(AssemblerExpression):
         return w
 
     def fold(self, **kwargs):
-        word = self.word
-
         if 'validate' in kwargs:
-            kwargs['validate'](word)
+            kwargs['validate'](self.word)
 
-        if ('words' in kwargs) and (word in kwargs['words']):
-            return kwargs['words'][word].clone().fold(**kwargs)
+        if ('words' in kwargs) and (self.word in kwargs['words']):
+            return kwargs['words'][self.word].clone().fold(**kwargs)
 
         return self
 
@@ -839,7 +837,7 @@ class Assembler:
             yield self.equate(t, words)
 
     """ Convert complete instructions into binaries """
-    def getField(self, exp, **kwargs):
+    def getField(self, exp, flatten=False, **kwargs):
         if isinstance(exp, AssemblerRegister):
             return self.REG_FIELD[exp.register], None
         elif isinstance(exp, AssemblerIndirect):
@@ -865,7 +863,7 @@ class Assembler:
                 return 0x20 + (num+1), None
             else:
                 return (0x1f, num)
-        elif 'flatten' in kwargs:
+        elif flatten:
             return (0x1f, exp)
 
         return None
@@ -966,38 +964,21 @@ class Assembler:
 
         tokens = self.definitions(self.flatten(filename))
         tokens = self.pack(self.process(tokens))
-        tokens = self.instruct(tokens)
+        tokens = self.instruct(tokens, flatten=relocate)    # Pre-instruction flatten if relocation tables are used
 
-        # Flatten tokens, flag parameters as relocating here
+        # This is the first place where relocation data is useful
         if relocate:
-            tokens = self.instruct(tokens, flatten=True)
             tokens = self.relocate(tokens, relocations)
 
-        tokens = list(tokens)
-        print "-----"
-        for t in tokens:
-            print t
-
-        tokens = list(tokens)
-        print "-----"
-        tokens = self.label(tokens, labels, discovered)
-        tokens = self.undefined(tokens, discovered)
-
-        tokens = list(tokens)
-        print "-----"
-        for t in tokens:
-            print t
-
         while True:
+            tokens = self.label(tokens, labels)
+            tokens = self.refold(tokens, labels)
             tokens = self.instruct(tokens, flatten=flatten)
 
             flatten = True
             tokens = list(tokens)
             if self.finished(tokens): 
                 break
-            tokens = self.label(tokens, labels)
-            tokens = self.pack(tokens)
-            tokens = self.refold(tokens, labels)
 
         return [b for b in self.data(tokens, words=labels)], labels, relocations
 
