@@ -1002,8 +1002,6 @@ class Assembler:
             tokens = list(tokens)
             flatten = True
 
-            tokens = self.estimate(tokens)
-
         return [b for b in self.data(tokens, words=labels)], labels, relocations
 
 # ---- OUTPUT FORMATS

@@ -27,7 +27,7 @@ else:
             elif opt == '--reloc':
                 print >>file(arg, "w"), ', '.join([str(s) for s in relocations])
             elif opt == '--output':
-                print >>file(arg, "wb"), binaryOutput(data)
+                file(arg, "wb").write(binaryOutput(data))
             elif opt == '--hex':
                 print >>file(arg, "w"), '\n'.join(intelHex(data))
             elif opt == '--dat':
