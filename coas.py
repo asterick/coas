@@ -91,7 +91,7 @@ class AssemblerDataBlock:
 class AssemblerLabel:
     def __init__(self, pos, name):
         self.pos = pos
-        self.name = name
+        self.name = name.lower()
 
     def setGroup(self, group):
         if self.name[0] == '_':
@@ -846,7 +846,7 @@ class Assembler:
 
     """ Attempt to stuff words into their respective areas """
     def refold(self, tokens, words):
-        for t in [t for t in tokens]:
+        for t in list(tokens):
             yield self.equate(t, words)
 
     """ Convert complete instructions into binaries """
@@ -854,7 +854,7 @@ class Assembler:
         if isinstance(exp, AssemblerRegister):
             return self.REG_FIELD[exp.register], None
         elif isinstance(exp, AssemblerIndirect):
-            if isinstance(exp.term, AssemblerBinary) and exp.term.operation == '+' and isinstance(a, AssemblerRegister):
+            if isinstance(exp.term, AssemblerBinary) and exp.term.operation == '+' and isinstance(exp.term.term_a, AssemblerRegister):
                 op, a, b = exp.term.operation, exp.term.term_a, exp.term.term_b
 
                 # This can always be flatted, we do not provide a short literal
@@ -972,7 +972,7 @@ class Assembler:
                     if isinstance(o, AssemblerNumber):
                         yield o.number & 0xFFFF
                     else:
-                        raise AssemblerException(b.pos, "Could not evaluate to a number")
+                        raise AssemblerException(b.pos, "Could not evaluate to a number: %s" % b )
                 else:
                     yield b
             yield AssemblerAnnotation(t.pos)

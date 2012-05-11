@@ -39,7 +39,7 @@ _loop:  SUB I, 1
         SET A, 0
         SET B, screen
         HWI I
-        JMP _loop
+        SET PC, POP
 .endproc
 
 ; === DATA SECTION
