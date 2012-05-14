@@ -45,11 +45,18 @@ Example Source
 Directives
 ----------
 
-`.org` address`
-Redefine the origin address for the following instructions and labels (defaults to 0)
+`.org address`
+Set the relative origin of labels.  Does not alter the layout of the actual code generated
+
+Example
+    .org 0x0000
+    label1: ; This is 0x0000
+    .org 0x8000
+    label2: ; This is 0x8000
+
 
 `.align block-width`
-Pad out the current data to N bytes to maintain even alignment.
+Pad out the current data to N bytes to maintain even alignment between blocks of code and data
 
 `.bss block-size`
 Defines a space without create actual binary data (useful for creating uninitialized data sections)
