@@ -241,6 +241,7 @@ class AssemblerUnary(AssemblerExpression):
             return AssemblerNumber(self.pos, -self.term.number)
         elif self.operation == '~':
             return AssemblerNumber(self.pos, ~self.term.number)
+        raise AssemblerException(self.pos, "Unknown operator %s" % self.operation)
 
     def fold(self, **kwargs):
         self.term = self.term.fold(**kwargs)
@@ -962,7 +963,6 @@ class Assembler:
             for b in t.data:
                 if isinstance(b, AssemblerExpression):
                     o = b.fold(words=words)
-                    
                     if isinstance(o, AssemblerNumber):
                         yield o.number & 0xFFFF
                     else:
@@ -971,12 +971,6 @@ class Assembler:
                     yield b
             yield AssemblerAnnotation(t.pos)
 
-    def estimate(self, tokens):
-        print "---"
-        for t in tokens:
-            print t
-            yield t
-
     def assemble(self, filename, relocate=False):
         labels, relocations, discovered, flatten = {}, [], [], False
 
@@ -984,7 +978,7 @@ class Assembler:
         tokens = self.pack(self.process(tokens))
         tokens = self.instruct(tokens, flatten=relocate)    # Pre-instruction flatten if relocation tables are used
 
-        # This is the first place where relocation data is useful
+        # This is the first place where relocation data is useful (probably breaks with .align)
         if relocate:
             tokens = self.relocate(tokens, relocations)
 
