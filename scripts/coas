@@ -30,7 +30,7 @@ try:
         print >>file(ns.list_file, "w"), '\n'.join(mapping(lableMap))
     if ns.reloc_file:
         print >>file(ns.reloc_file, "w"), ', '.join([str(s) for s in relocations])
-    
+
     if ns.bin_file:
         file(ns.bin_file, "wb").write(binaryOutput(data))
     if ns.hex_file:

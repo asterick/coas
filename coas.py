@@ -1,11 +1,5 @@
 import re, os, struct
 
-_guidCounter = 0
-def guid():
-    global _guidCounter
-    _guidCounter = _guidCounter + 1
-    return _guidCounter
-
 class AssemblerException(Exception):
     def __init__(self, pos, err):
         self.pos = pos
