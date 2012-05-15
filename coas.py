@@ -971,12 +971,18 @@ class Assembler:
                     yield b
             yield AssemblerAnnotation(t.pos)
 
+    def foldlabels(self, labels):
+        for k, v in labels.items():
+            if isinstance(v, AssemblerExpression):
+                labels[k] = v.fold(words=labels)
+        return labels
+
     def assemble(self, filename, relocate=False):
         labels, relocations, discovered, flatten = {}, [], [], False
 
         tokens = self.definitions(self.flatten(filename))
         tokens = self.pack(self.process(tokens))
-        tokens = self.instruct(tokens, flatten=relocate)    # Pre-instruction flatten if relocation tables are used
+        tokens = self.instruct(tokens, flatten=relocate)
 
         # This is the first place where relocation data is useful (probably breaks with .align)
         if relocate:
@@ -990,52 +996,4 @@ class Assembler:
             tokens = list(tokens)
             flatten = True
 
-        return [b for b in self.data(tokens, words=labels)], labels, relocations
-
-# ---- OUTPUT FORMATS
-
-def binaryOutput(data):
-    return ''.join([struct.pack(">H", o) for o in data if not isinstance(o, AssemblerAnnotation)])
-
-def intelHex(data):
-    data = ''.join([struct.pack(">H", o) for o in bin if not isinstance(o, AssemblerAnnotation)])
-
-    chunkSize = 32
-    def chunk(c):
-        for i in range(0,len(c),chunkSize):
-            yield c[i:i+chunkSize]
-
-    def format(address, rec_type, data = []):
-        data = [len(data), address>>8, address & 0xFF, rec_type] + data
-        data += [((sum(data) ^ 0xFF) + 1) & 0xFF]
-        return ":" + (''.join(["%2X" % d for d in data])).replace(' ','0')
-
-    for addr, block in enumerate(chunk([ord(c) for c in data])):
-        yield format(addr * chunkSize, 0, block)
-    yield format(0,1)
-
-def datOutput(data):
-    leadIn = False
-    for k in data:
-        if isinstance(k, AssemblerAnnotation):
-            yield "; %s\n" % k.pos[3]
-            leadIn = False
-            continue 
-
-        if not leadIn:
-            yield "DAT "
-            leadIn = True
-
-        yield ("0x%4x" % k).replace(" ","0") + " "
-
-def verilog(data):
-    for k in data:
-        if isinstance(k, AssemblerAnnotation):
-            yield "// %s\n" % k.pos[3]
-        else:
-            yield ("%4x" % k).replace(" ","0") + " "
-
-def mapping(words):
-    for k, v in words.items():
-        if isinstance(k, basestring):
-            yield "%s\t%s" % (k, v)
+        return [b for b in self.data(tokens, words=labels)], self.foldlabels(labels), relocations

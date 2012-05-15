@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 import sys, argparse
-from coas import (Assembler, AssemblerException, intelHex, mapping,
-    binaryOutput, datOutput, verilog)
+from coas_format import (intelHex, mapping, binaryOutput, datOutput, verilog)
+from coas import (Assembler, AssemblerException)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-l', action='store', dest='list_file',
@@ -27,7 +27,7 @@ try:
     data, lableMap, relocations = a.assemble(ns.source, relocate=ns.reloc_file)
 
     if ns.list_file:
-        print >>file(ns.list_file, "w"), '\n'.join(mapping(lableMap))
+        print >>file(ns.list_file, "w"), mapping(lableMap)
     if ns.reloc_file:
         print >>file(ns.reloc_file, "w"), ', '.join([str(s) for s in relocations])
 
