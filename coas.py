@@ -357,6 +357,9 @@ class AssemblerIndirect(AssemblerExpression):
         self.pos = pos
         self.term = term
 
+    def setGroup(self, group):
+        self.term.setGroup(group)
+
     def clone(self, **kwargs):
         return AssemblerIndirect(self.pos, self.term.clone(**kwargs))
 
