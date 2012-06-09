@@ -703,11 +703,11 @@ class Assembler:
                     nesting = 0
 
                     if not isinstance(name, AssemblerWord):
-                        raise AssemblerException(d.pos, "Expected a term, found %s" % t)
+                        raise AssemblerException(name.pos, "Expected a term, found %s" % name)
 
                     for word in args:
                         if not isinstance(name, AssemblerWord):
-                            raise AssemblerException(d.pos, "Expected a term, found %s" % t)
+                            raise AssemblerException(name.pos, "Expected a term, found %s" % name)
 
                     try:
                         while True:
