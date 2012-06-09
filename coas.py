@@ -77,6 +77,9 @@ class AssemblerDataBlock:
     def __init__(self, pos, data):
         self.pos = pos
         self.data = data
+    def setGroup(self, group):
+        for p in self.data:
+            p.setGroup(group)
     def add(self, data):
         self.data += data
     def __str__(self):
@@ -619,9 +622,9 @@ class Assembler:
             elif type == '.little':
                 little, big = data[::2], data[1::2]
 
-            data = [AssemblerBinary(l.pos, '|', 
-                    AssemblerBinary(l.pos, '<<', big[i], AssemblerNumber(l.pos, 8)),
-                    AssemblerBinary(l.pos, '&', l, AssemblerNumber(l.pos, 0xFF)))
+            data = [AssemblerBinary(pos, '|', 
+                    AssemblerBinary(pos, '<<', AssemblerNumber(pos, big[i]), AssemblerNumber(pos, 8)),
+                    AssemblerBinary(pos, '&', AssemblerNumber(pos, l), AssemblerNumber(pos, 0xFF)))
                     for i, l in enumerate(little)]
 
         return AssemblerDataBlock(pos, data)
@@ -792,11 +795,26 @@ class Assembler:
                 if position != None and isinstance(num, AssemblerNumber):
                     offset = position % num.number
                     if offset:
-                        yield AssemblerDataBlock(t.pos, [0]*(num.number-offset))
+                        l = num.number-offset
+                        yield AssemblerDataBlock(t.pos, [AssemblerNumber(t.pos,0)]*l)
+                        position += l
                 else:
                     raise AssemblerException(t.pos, "Long-term evaluation of %s is not allowed for align statements" % t)
 
-            elif isinstance(t, AssemblerMeta) and t.name in ['.org', '.bss']:
+            elif isinstance(t, AssemblerMeta) and t.name in ['.bss']:
+                if len(t.parameters) != 1 or len(t.parameters[0].list) != 1:
+                    raise AssemblerException("Malformed expression %s" % t)
+                
+                num = t.parameters[0].list[0].fold(words=words)
+                t.parameters[0].list = [num]
+
+                if position != None and isinstance(num, AssemblerNumber):
+                    yield AssemblerDataBlock(t.pos, [AssemblerNumber(t.pos,0)]*(num.number))
+                    position += num.number
+                else:
+                    raise AssemblerException(t.pos, "Long-term evaluation of %s is not allowed for bss statements" % t)
+
+            elif isinstance(t, AssemblerMeta) and t.name in ['.org']:
                 if len(t.parameters) != 1 or len(t.parameters[0].list) != 1:
                     raise AssemblerException("Malformed expression %s" % t)
 
@@ -809,15 +827,12 @@ class Assembler:
                     position = None
                     continue
                 
-                if t.name == '.bss':
-                    if position != None:
-                        position += num.number
-                else:
-                    position, reference = num.number, None
+                position, reference = num.number, None
             elif isinstance(t, AssemblerDataBlock):
                 if position != None:
                     position += len(t.data)
                 yield t
+
             elif isinstance(t, AssemblerLabel):
                 word = t.name
                 
@@ -938,7 +953,7 @@ class Assembler:
 
     def finished(self, set):
         for k in set:
-            if isinstance(k, AssemblerMeta) and k.name in ['.org', '.bss']:
+            if isinstance(k, AssemblerMeta) and k.name in ['.org']:
                 continue
             if not isinstance(k, AssemblerDataBlock):
                 return False
@@ -958,7 +973,7 @@ class Assembler:
 
     def data(self, tokens, words):
         for t in tokens:
-            if isinstance(t, AssemblerMeta) and t.name in ['.org', '.bss']:
+            if isinstance(t, AssemblerMeta) and t.name in ['.org']:
                 continue
             for b in t.data:
                 if isinstance(b, AssemblerExpression):

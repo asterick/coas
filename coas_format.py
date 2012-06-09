@@ -1,3 +1,5 @@
+from coas import AssemblerAnnotation
+
 def mapping(words):
     return ''.join(["%s\t%s\n" % (k, v) for k, v in words.items()])
 
