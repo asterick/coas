@@ -1,4 +1,5 @@
 from coas import AssemblerAnnotation
+import struct
 
 def mapping(words):
     return ''.join(["%s\t%s\n" % (k, v) for k, v in words.items()])
