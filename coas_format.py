@@ -4,8 +4,8 @@ import struct
 def mapping(words):
     return ''.join(["%s\t%s\n" % (k, v) for k, v in words.items()])
 
-def binaryOutput(data):
-    return ''.join([struct.pack(">H", o) for o in data if not isinstance(o, AssemblerAnnotation)])
+def binaryOutput(data, endian=">"):
+    return ''.join([struct.pack(endian+"H", o) for o in data if not isinstance(o, AssemblerAnnotation)])
 
 def intelHex(data):
     data = ''.join([struct.pack(">H", o) for o in bin if not isinstance(o, AssemblerAnnotation)])
