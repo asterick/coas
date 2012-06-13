@@ -515,8 +515,8 @@ class Assembler:
             if not top.operation in self.UNARY:
                 raise AssemblerException(top.pos, "%s used as a unary operator" % top)
 
-            tokens, term = self.term(tokens[1:])
-
+            term, tokens = self.term(tokens[1:])
+            
             return AssemblerUnary(top.pos, top.operation, term), tokens
         elif isinstance(top, ExpressionToken) and top.category == 'open':
             exp, tokens = self.expression(tokens[1:])
