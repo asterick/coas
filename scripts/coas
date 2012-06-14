@@ -45,3 +45,4 @@ try:
         print >>file(ns.verilog_file, "w"), "@0000\n%s\n" % ''.join(verilog(data))
 except AssemblerException as e:
     print e 
+    sys.exit(-1)
