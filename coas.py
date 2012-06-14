@@ -812,7 +812,6 @@ class Assembler:
                 t.parameters[0].list = [num]
 
                 if position != None and isinstance(num, AssemblerNumber):
-                    yield AssemblerDataBlock(t.pos, [AssemblerNumber(t.pos,0)]*(num.number))
                     position += num.number
                 else:
                     raise AssemblerException(t.pos, "Long-term evaluation of %s is not allowed for bss statements" % t)
