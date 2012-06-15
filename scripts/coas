@@ -40,7 +40,7 @@ try:
     if ns.hex_file:
         print >>file(ns.hex_file, "w"), '\n'.join(intelHex(data))
     if ns.dat_file:
-        print >>file(ns.dat_file, "w"), ''.join(datOutput(data))
+        print >>file(ns.dat_file, "w"), '\n'.join(datOutput(data))
     if ns.verilog_file == '--verilog':
         print >>file(ns.verilog_file, "w"), "@0000\n%s\n" % ''.join(verilog(data))
 except AssemblerException as e:
