@@ -39,14 +39,14 @@ class AssemblerMacro:
         words = {}
 
         if len(params) > 0:
+            param_count = len(params[0].list)
+            if param_count != len(self.args):
+                raise AssemblerException(t.pos, "Macro argument count mismatch")
+
             for idx, param in enumerate(params[0].list):
                 words[self.args[idx].word] = param
-            param_count = len(params[0].list)
         else:
             param_count = 0
-
-        if param_count != len(self.args):
-            raise AssemblerException(t.pos, "Macro argument count mismatch")
 
         uuid = self.id()
         for t in self.terms:
@@ -606,6 +606,10 @@ class Assembler:
                 yield token
                 token = assembly.next()
 
+            # We want to be able to macro tokens
+            if isinstance(token, AssemblerRegister):
+                token = AssemblerWord(token.pos, token.register)
+
             if isinstance(token, AssemblerMeta) or isinstance(token, AssemblerWord):
                 operation = token
                 operation.parameters = self.arguments(assembly)
@@ -685,6 +689,9 @@ class Assembler:
                     name = t.parameters[0].list[0]
                     equ = t.parameters[1].list[0]
 
+                    if isinstance(name, AssemblerRegister):
+                        raise AssemblerException(d.pos, "Cannot use a register name as an equate: %s" % t)
+
                     if not isinstance(name, AssemblerWord):
                         raise AssemblerException(d.pos, "Expected a term, found %s" % t)
 
@@ -705,11 +712,15 @@ class Assembler:
                     contents = []
                     nesting = 0
 
-                    if not isinstance(name, AssemblerWord):
+                    # We convert registers over to words in this case
+                    if isinstance(name, AssemblerRegister):
+                        name = AssemblerWord(name.pos, name.register)
+                        
+                    elif not isinstance(name, AssemblerWord):
                         raise AssemblerException(name.pos, "Expected a term, found %s" % name)
 
                     for word in args:
-                        if not isinstance(name, AssemblerWord):
+                        if not isinstance(word, AssemblerWord):
                             raise AssemblerException(name.pos, "Expected a term, found %s" % name)
 
                     try:
