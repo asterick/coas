@@ -25,22 +25,22 @@ def intelHex(data):
     yield format(0,1)
 
 def datOutput(data):
-    leadIn, limit, start = False, 0, 0
-    for p, k in enumerate(data):
+    words = []
+    leadIn = False
+    for k in data:
         if isinstance(k, AssemblerAnnotation):
-            yield "; (%4x) %s" % (start, k.pos[3])
-            leadIn = False
-            continue 
+            yield "DAT %24s ; %s" % (', '.join(words), k.pos[3])
+            words = []
+            continue
 
-        if not leadIn:
-            yield "\nDAT "
-            leadIn, limit, start = True, 0, p
-        elif limit >= 8:
-            yield "\nDAT "
-            leadIn, limit = True, 0
-
-        yield ("0x%4x" % k).replace(" ","0") + " "
-        limit += 1
+        elif len(words) >= 8:
+            yield "DAT %s" % (', '.join(words))
+            words = []
+        
+        words += [("0x%4x" % k).replace(" ","0")]
+        
+    if words:
+        yield "DAT %s\n" % (', '.join(words))
 
 def verilog(data):
     for k in data:
