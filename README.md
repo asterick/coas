@@ -1,6 +1,8 @@
 COAS - The 0x10c assembler (python based)
 =========================================
 
+**NOTE: THIS PROJECT HAS BEEN FROZEN IN FAVOR OF THE MORE ROBUST [JCOAS](/asterick/jcoas) PROJECT** 
+
 COAS is a basic assembler for the 0x10c DCPU.  Currently, it supports a the v1.7 DCPU standard
 and a good number of directives.
 
